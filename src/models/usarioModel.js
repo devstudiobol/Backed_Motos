@@ -2,7 +2,7 @@ const pool =require("../config/db")
 const bcrypt = require('bcrypt'); // ← Ahora sí bcrypt normal
 // ... el resto del código igual pero con bcrypt
 exports.listarUser=async()=>{
-    const {rows}=await pool.query("SELECT * FROM usuario")
+    const {rows}=await pool.query("SELECT * FROM usuario Where estado='Activo'")
     return rows
 }
 exports.crearUser=async(usuario,password)=>{
