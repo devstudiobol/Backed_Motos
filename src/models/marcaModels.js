@@ -1,7 +1,7 @@
 const pool=require("../config/db")
 
 exports.crearMarca=async(descripcion)=>{
-    const estado="activo"
+    const estado="Activo"
     const {rows}= await pool.query("INSERT INTO marca (descripcion,estado) VALUES($1,$2)",[descripcion,estado])
     return rows[0]
 }
