@@ -1,8 +1,8 @@
-const {crearProducto, listarProducto, actualizarProducto, softDeleteProducto, obtenerProductoPorId} = require("../models/producto")
-const upload = require('../config/multer');
+const { crearProducto, listarProducto, actualizarProducto, softDeleteProducto, obtenerProductoPorId } = require("../models/producto");
+const upload = require('../config/upload'); // Cambia la ruta al nuevo middleware
 const { cloudinary } = require('../config/cloudinary');
 
-// Middleware para subir una sola imagen (se mantiene igual)
+// Middleware para subir una sola imagen (ahora con Cloudinary)
 exports.uploadImage = upload.single('imagen');
 
 exports.getProductoById = async (req, res, next) => {
@@ -16,81 +16,52 @@ exports.getProductoById = async (req, res, next) => {
         }
         
         // Ya no necesitamos construir la URL manualmente
-        // Cloudinary nos devuelve la URL completa en la respuesta
+        // Cloudinary ya nos proporciona una URL completa
         res.status(200).json(response);
     } catch (error) {
         next(error);
     }
 };
+
 exports.createProducto = async (req, res, next) => {
-    console.log('📦 Body recibido:', req.body);
-    console.log('🖼️ Archivo recibido:', req.file);
-    
     const { idmarca, idtipo, detalle, cilindrada, precio, titulo } = req.body;
     
     try {
         // Verificar si se subió una imagen
         if (!req.file) {
-            console.log('❌ No se recibió archivo');
             return res.status(400).json({ error: 'Debe subir una imagen' });
         }
 
-        console.log('✅ Archivo procesado por Multer:', req.file);
-
-        // Verificar que Cloudinary devolvió la URL
-        if (!req.file.path || !req.file.path.startsWith('http')) {
-            console.error('❌ URL de Cloudinary inválida:', req.file.path);
-            return res.status(500).json({ 
-                error: 'Error al subir la imagen a Cloudinary',
-                details: 'URL inválida recibida'
-            });
-        }
-
+        // Guardar la URL de Cloudinary y el public_id en la base de datos
         const imagenUrl = req.file.path;
-        const imagenPublicId = req.file.filename;
-
-        console.log('🌐 URL de Cloudinary:', imagenUrl);
-        console.log('🔑 Public ID:', imagenPublicId);
+        const imagenPublicId = req.file.filename; // Este es el public_id de Cloudinary
 
         const response = await crearProducto(
-            parseInt(idmarca), 
-            parseInt(idtipo), 
-            imagenUrl,
+            idmarca, 
+            idtipo, 
+            imagenUrl, // Guardamos la URL completa
             detalle, 
             cilindrada, 
-            parseFloat(precio), 
+            precio, 
             titulo
         );
         
-        console.log('✅ Producto creado en BD:', response);
-        
         res.status(201).json({
             message: 'Producto creado exitosamente',
-            producto: response
+            producto: response,
+            imagen: imagenUrl
         });
     } catch (error) {
-        console.error('❌ Error en createProducto:', error);
-        
-        // Manejo específico de errores de base de datos
-        if (error.code === '23503') { // Foreign key violation
-            return res.status(400).json({ 
-                error: 'Marca o tipo inválido',
-                details: 'Verifica que la marca y tipo existan'
-            });
-        }
-        
-        res.status(500).json({ 
-            error: 'Error interno del servidor',
-            details: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
+        next(error);
     }
 };
+
 exports.getProducto = async (req, res, next) => {
     try {
         const response = await listarProducto();
         
-        // Ya no necesitamos mapear para construir URLs
-        // Las URLs ya vienen completas desde la base de datos
+        // Ya no necesitamos construir URLs manualmente
+        // Cloudinary ya nos proporciona URLs completas
         res.status(200).json(response);
     } catch (error) {
         next(error);
@@ -103,24 +74,20 @@ exports.updateProducto = async (req, res, next) => {
     
     try {
         let imagenUrl = req.body.imagen; // Mantener la imagen actual por defecto
+        let imagenPublicId = req.body.imagenPublicId;
 
         // Si se subió una nueva imagen
         if (req.file) {
-            imagenUrl = req.file.path; // Nueva URL de Cloudinary
+            imagenUrl = req.file.path;
+            imagenPublicId = req.file.filename;
             
-            // Opcional: Eliminar la imagen anterior de Cloudinary
+            // Eliminar la imagen anterior de Cloudinary si existe
             const productoActual = await obtenerProductoPorId(id);
-            if (productoActual && productoActual.imagen) {
+            if (productoActual && productoActual.imagenPublicId) {
                 try {
-                    // Extraer public_id de la URL (asumiendo que guardaste el public_id)
-                    // Si no guardaste el public_id, puedes omitir esta parte
-                    const urlParts = productoActual.imagen.split('/');
-                    const publicIdWithExtension = urlParts[urlParts.length - 1];
-                    const publicId = publicIdWithExtension.split('.')[0];
-                    
-                    await cloudinary.uploader.destroy(`motocicletas/${publicId}`);
+                    await cloudinary.uploader.destroy(productoActual.imagenPublicId);
                 } catch (error) {
-                    console.error('Error al eliminar imagen anterior de Cloudinary:', error);
+                    console.error("Error al eliminar imagen anterior de Cloudinary:", error);
                     // No fallamos la operación principal por esto
                 }
             }
@@ -129,7 +96,7 @@ exports.updateProducto = async (req, res, next) => {
         const response = await actualizarProducto(
             idmarca, 
             idtipo, 
-            imagenUrl, // Usamos la URL completa
+            imagenUrl, 
             detalle, 
             cilindrada, 
             precio, 
@@ -139,16 +106,32 @@ exports.updateProducto = async (req, res, next) => {
         
         res.status(200).json({
             message: 'Producto actualizado exitosamente',
-            producto: response
+            producto: response,
+            imagen: imagenUrl
         });
     } catch (error) {
         next(error);
     }
 };
 
+// Agregar esta función para eliminar imágenes cuando se elimine un producto
+exports.deleteImage = async (publicId) => {
+    try {
+        await cloudinary.uploader.destroy(publicId);
+    } catch (error) {
+        console.error("Error al eliminar imagen de Cloudinary:", error);
+    }
+};
+
 exports.deactivateProducto = async (req, res, next) => {
     const { id } = req.params;
     try {
+        // Opcional: eliminar la imagen de Cloudinary al desactivar el producto
+        const producto = await obtenerProductoPorId(id);
+        if (producto && producto.imagenPublicId) {
+            await exports.deleteImage(producto.imagenPublicId);
+        }
+        
         const response = await softDeleteProducto(id);
         res.status(200).json(response);
     } catch (error) {

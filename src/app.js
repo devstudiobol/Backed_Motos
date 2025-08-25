@@ -9,8 +9,6 @@ const tipoRoutes = require("./routes/tipoRoutes");
 const productoRoutes = require("./routes/productoRoutes");
 const authRoutes = require("./routes/authRoutes");
 const errorHandler = require("./middleware/errorHandler");
-const path = require('path');
-const fs = require('fs');
 
 // Importar la inicialización de la BD
 const initDatabase = require("./config/init");
