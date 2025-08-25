@@ -90,7 +90,7 @@ app.get('/api/cloudinary-status', async (req, res) => {
   try {
     const result = await cloudinary.api.resources({
       type: 'upload',
-      prefix: 'motocicletas',
+      prefix: 'motos',
       max_results: 1
     });
     
@@ -98,7 +98,7 @@ app.get('/api/cloudinary-status', async (req, res) => {
       status: 'success',
       message: 'Cloudinary conectado correctamente',
       resources_count: result.resources.length,
-      folder: 'motocicletas'
+      folder: 'motos'
     });
   } catch (error) {
     res.status(500).json({
