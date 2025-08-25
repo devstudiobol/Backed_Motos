@@ -1,5 +1,5 @@
 
-const {listarUser,crearUser, actualizarUser}=require("../models/usarioModel")
+const {listarUser,crearUser, actualizarUser, eliminarUsuario}=require("../models/usarioModel")
 
 exports.getUser=async(req,res,next)=>{
     try {
@@ -32,4 +32,14 @@ exports.updateUser=async(req,res,next)=>{
         next(error)
     }
 }
+exports.deleteUser=async(req,res,next)=>{
+    const {id}=req.params
+    try {
+        const response= await  eliminarUsuario(id)
+        res.status(202).json(response)
+    } catch (error) {
+        next(error)
+    }
+}
+
 
