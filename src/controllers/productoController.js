@@ -22,39 +22,69 @@ exports.getProductoById = async (req, res, next) => {
         next(error);
     }
 };
-
 exports.createProducto = async (req, res, next) => {
+    console.log('📦 Body recibido:', req.body);
+    console.log('🖼️ Archivo recibido:', req.file);
+    
     const { idmarca, idtipo, detalle, cilindrada, precio, titulo } = req.body;
     
     try {
         // Verificar si se subió una imagen
         if (!req.file) {
+            console.log('❌ No se recibió archivo');
             return res.status(400).json({ error: 'Debe subir una imagen' });
         }
 
-        // Con Cloudinary, req.file ya tiene la información completa
-        const imagenUrl = req.file.path; // URL completa de Cloudinary
-        const imagenPublicId = req.file.filename; // public_id de Cloudinary
+        console.log('✅ Archivo procesado por Multer:', req.file);
+
+        // Verificar que Cloudinary devolvió la URL
+        if (!req.file.path || !req.file.path.startsWith('http')) {
+            console.error('❌ URL de Cloudinary inválida:', req.file.path);
+            return res.status(500).json({ 
+                error: 'Error al subir la imagen a Cloudinary',
+                details: 'URL inválida recibida'
+            });
+        }
+
+        const imagenUrl = req.file.path;
+        const imagenPublicId = req.file.filename;
+
+        console.log('🌐 URL de Cloudinary:', imagenUrl);
+        console.log('🔑 Public ID:', imagenPublicId);
 
         const response = await crearProducto(
-            idmarca, 
-            idtipo, 
-            imagenUrl, // Guardamos la URL completa
+            parseInt(idmarca), 
+            parseInt(idtipo), 
+            imagenUrl,
             detalle, 
             cilindrada, 
-            precio, 
+            parseFloat(precio), 
             titulo
         );
+        
+        console.log('✅ Producto creado en BD:', response);
         
         res.status(201).json({
             message: 'Producto creado exitosamente',
             producto: response
         });
     } catch (error) {
-        next(error);
+        console.error('❌ Error en createProducto:', error);
+        
+        // Manejo específico de errores de base de datos
+        if (error.code === '23503') { // Foreign key violation
+            return res.status(400).json({ 
+                error: 'Marca o tipo inválido',
+                details: 'Verifica que la marca y tipo existan'
+            });
+        }
+        
+        res.status(500).json({ 
+            error: 'Error interno del servidor',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
     }
 };
-
 exports.getProducto = async (req, res, next) => {
     try {
         const response = await listarProducto();

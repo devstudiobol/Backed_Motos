@@ -7,7 +7,7 @@ exports.crearMarca=async(descripcion)=>{
 }
 
 exports.listarMarca=async()=>{
-    const {rows}=await pool.query("SELECT* FROM marca Where estado='Activo' ")
+    const {rows}=await pool.query("SELECT * FROM marca Where estado='Activo' ")
     return rows
 }
 exports.actualizarMarca=async(descripcion, id)=>{
